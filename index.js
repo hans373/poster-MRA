@@ -5,8 +5,8 @@ const PORT = process.env.PORT || 3000;
 // ================================================================
 // CONFIGURATION - YOUR TOKENS
 // ================================================================
-const POSTER_ACCESS_TOKEN = '197249:22124116c0cdc8ce54e90e7c085b51ae'; // ← YOUR ACCESS TOKEN
-const CLIENT_SECRET = '661636b73b1b34aaca2460034e55ebb1'; // ← YOUR APPLICATION SECRET
+const POSTER_ACCESS_TOKEN = '197249:22124116c0cdc8ce54e90e7c085b51ae';
+const CLIENT_SECRET = '661636b73b1b34aaca2460034e55ebb1';
 
 // Parse JSON bodies
 app.use(express.json());
@@ -199,7 +199,8 @@ async function sendToMraAndPrint(saleData) {
 // ================================================================
 async function printReceiptWithQR(saleData, mraResponse) {
     try {
-        const posterApiUrl = 'https://joinposter.com/api/';
+        // CORRECT Poster API endpoint
+        const posterApiUrl = 'https://joinposter.com/api';
         
         // The order ID - use the history_time from the sale
         const orderId = saleData.history_time || Date.now();
@@ -214,8 +215,12 @@ async function printReceiptWithQR(saleData, mraResponse) {
         console.log('📋 QR Code:', qrCode);
         console.log('📋 QR Title:', qrCodeTitle);
         
+        // Build the request URL
+        const url = `${posterApiUrl}/orders.printReceipt`;
+        console.log('📋 API URL:', url);
+        
         // Call Poster's API to print receipt
-        const response = await fetch(`${posterApiUrl}orders.printReceipt`, {
+        const response = await fetch(url, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -228,8 +233,29 @@ async function printReceiptWithQR(saleData, mraResponse) {
             })
         });
         
-        const result = await response.json();
-        console.log('✅ Receipt print response:', JSON.stringify(result, null, 2));
+        // Check if response is JSON
+        const contentType = response.headers.get('content-type');
+        console.log('📋 Response Content-Type:', contentType);
+        
+        if (contentType && contentType.includes('application/json')) {
+            const result = await response.json();
+            console.log('✅ Receipt print response:', JSON.stringify(result, null, 2));
+        } else {
+            // If not JSON, show the raw response
+            const text = await response.text();
+            console.log('⚠️ Non-JSON response from Poster API:');
+            console.log('📋 Status:', response.status);
+            console.log('📋 Response text:', text.substring(0, 500));
+            
+            // Try to extract error message
+            if (response.status === 401 || response.status === 403) {
+                console.log('❌ Authentication failed - check your Access Token');
+            } else if (response.status === 404) {
+                console.log('❌ API endpoint not found - check the URL');
+            } else {
+                console.log(`❌ API error (${response.status})`);
+            }
+        }
         
     } catch (error) {
         console.error('❌ Error printing receipt:', error.message);
